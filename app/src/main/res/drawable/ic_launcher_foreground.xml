@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A tiny timetable: header row, hour column, and three coloured blocks -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF" android:pathData="M32,30h44a4,4 0 0 1 4,4v6h-52v-6a4,4 0 0 1 4,-4z" />
+    <path android:fillColor="#66FFFFFF" android:pathData="M28,43h10v35h-6a4,4 0 0 1 -4,-4z" />
+    <path android:fillColor="#FFC857" android:pathData="M41,43h11v16h-11z" />
+    <path android:fillColor="#5EEAD4" android:pathData="M55,43h11v9h-11z" />
+    <path android:fillColor="#FF8FA3" android:pathData="M69,43h11v20h-11z" />
+    <path android:fillColor="#5EEAD4" android:pathData="M41,62h11v16h-11z" />
+    <path android:fillColor="#FFC857" android:pathData="M55,55h11v23h-11z" />
+    <path android:fillColor="#B8B5FF" android:pathData="M69,66h11v8a4,4 0 0 1 -4,4h-7z" />
+</vector>
