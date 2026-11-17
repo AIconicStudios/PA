@@ -10,7 +10,8 @@ import com.aiconicstudios.pa.data.AppState
 import com.aiconicstudios.pa.data.Category
 import com.aiconicstudios.pa.data.ChatMsg
 import com.aiconicstudios.pa.data.Goal
-import com.aiconicstudios.pa.data.ScheduleMath
+import com.aiconicstudios.pa.data.Persona
+import com.aiconicstudios.pa.coach.OfflineCoach
 import com.aiconicstudios.pa.data.Settings
 import com.aiconicstudios.pa.data.Workspace
 import com.aiconicstudios.pa.ui.PaTheme
@@ -56,36 +57,17 @@ class ScreenshotTest {
     )
 
     private val today = LocalDate.now()
-    private val sampleReply = """
-        A flexible waist in a month is realistic with 3 focused sessions a week — we'll build range gradually.
-
-        ## This week
-        - [ ] Mon: 10 min warm-up, 3×12 standing side bends, 2×30 s cat-cow
-        - [ ] Wed: hip circles 2×10 each way, seated twists 3×8, child's pose 1 min
-        - [ ] Fri: repeat Monday, add 2×20 s side planks
-
-        ## Week 2–3: build range
-        - Hold stretches **45 s** instead of 30 s
-        - Add standing windmills and thread-the-needle
-
-        ## Week 4: test it
-        - Compare your side-bend reach to day 1
-
-        Tip: lay your mat out before 6 pm so starting takes zero effort.
-    """.trimIndent()
-
-    private val workspace = Workspace(
-        goal = Goal("Flexible waist", 30, today.minusDays(5).toString()),
-        plan = sampleReply,
-        tasks = ScheduleMath.parseChecklist(sampleReply).mapIndexed { i, t -> t.copy(done = i == 0) },
-        chat = listOf(
-            ChatMsg(true, "My goal: Flexible waist. Time frame: 1 month. Please build my plan."),
-            ChatMsg(false, sampleReply),
-        ),
-        // The last three Mon/Wed/Fri sessions before today
-        checkIns = generateSequence(today.minusDays(1)) { it.minusDays(1) }
-            .filter { it.dayOfWeek.value in exercise.days }.take(3).map { it.toString() }.toList(),
-    )
+    // Real output from the built-in coach for a goal set 5 days ago.
+    private val goal = Goal("Flexible waist", 30, today.minusDays(5).toString())
+    private val workspace = OfflineCoach.startGoal(exercise, Workspace(), goal, Persona.HYPE, today).let { r ->
+        r.workspace.copy(
+            tasks = r.workspace.tasks.mapIndexed { i, t -> t.copy(done = i == 0) },
+            chat = listOf(ChatMsg(true, "My goal: Flexible waist, in 1 month."), ChatMsg(false, r.text)),
+            // The last three Mon/Wed/Fri sessions before today
+            checkIns = generateSequence(today.minusDays(1)) { it.minusDays(1) }
+                .filter { it.dayOfWeek.value in exercise.days }.take(3).map { it.toString() }.toList(),
+        )
+    }
 
     @Test fun timetable() = shoot("timetable") {
         TimetableScreen(
@@ -100,14 +82,14 @@ class ScreenshotTest {
 
     @Test fun workspace() = shoot("workspace") {
         WorkspaceScreen(
-            activity = exercise, workspace = workspace, settings = Settings(apiKey = "x"),
+            activity = exercise, workspace = workspace, settings = Settings(persona = Persona.HYPE),
             allActivities = activities, onBack = {}, onOpenSettings = {},
         )
     }
 
     @Test fun workspaceNewGoal() = shoot("workspace_new_goal") {
         WorkspaceScreen(
-            activity = exercise, workspace = Workspace(), settings = Settings(apiKey = "x"),
+            activity = exercise, workspace = Workspace(), settings = Settings(persona = Persona.HYPE),
             allActivities = activities, onBack = {}, onOpenSettings = {},
         )
     }

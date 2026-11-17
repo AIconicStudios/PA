@@ -13,8 +13,8 @@ android {
         applicationId = "com.aiconicstudios.pa"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     buildTypes {
@@ -31,19 +31,6 @@ android {
     }
     buildFeatures {
         compose = true
-    }
-    packaging {
-        resources {
-            excludes += setOf(
-                "META-INF/{AL2.0,LGPL2.1}",
-                "META-INF/DEPENDENCIES",
-                "META-INF/LICENSE*",
-                "META-INF/NOTICE*",
-                "META-INF/INDEX.LIST",
-                "META-INF/*.kotlin_module",
-                "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
-            )
-        }
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
@@ -67,9 +54,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-
-    // Claude (the AI coach) — official Anthropic SDK
-    implementation("com.anthropic:anthropic-java:3.3.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")

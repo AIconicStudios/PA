@@ -182,7 +182,8 @@ private fun NowNextCard(state: AppState, now: LocalDateTime, onOpen: (String) ->
             Column(Modifier.weight(1f)) {
                 Text(line, style = MaterialTheme.typography.labelMedium, color = accent, fontWeight = FontWeight.Bold)
                 Text(activity.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                val task = ws.tasks.firstOrNull { !it.done }?.text
+                val task = (ws.tasks.firstOrNull { it.date == now.toLocalDate().toString() && !it.done }
+                    ?: ws.tasks.firstOrNull { !it.done })?.text
                 Text(
                     task ?: "${ScheduleMath.formatRange(activity, state.settings.use24h)} · tap for your coach",
                     style = MaterialTheme.typography.bodySmall,

@@ -75,6 +75,8 @@ data class PlanTask(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
     val done: Boolean = false,
+    /** ISO date of the session this task belongs to, if any. */
+    val date: String? = null,
 )
 
 @Serializable
@@ -88,11 +90,14 @@ data class Workspace(
     val chat: List<ChatMsg> = emptyList(),
     /** ISO dates the user checked in ("I did it"). */
     val checkIns: List<String> = emptyList(),
+    /** Which week of the goal the checklist was built for (-1 = none yet). */
+    val planWeek: Int = -1,
+    /** Difficulty adjustment from "too easy" / "too hard" feedback, -3..+3. */
+    val intensity: Int = 0,
 )
 
 @Serializable
 data class Settings(
-    val apiKey: String = "",
     val firstHour: Int = 5,
     val lastHour: Int = 23,
     val use24h: Boolean = true,

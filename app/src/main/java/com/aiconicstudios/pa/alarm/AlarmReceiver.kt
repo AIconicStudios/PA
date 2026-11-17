@@ -41,7 +41,9 @@ class AlarmReceiver : BroadcastReceiver() {
                     AlarmScheduler.schedule(context, activity, LocalDateTime.now().plusMinutes(1))
                 }
                 ring(context, activity, notificationId, state.settings.use24h, state.settings.ringUntilDismissed,
-                    nextTask = state.workspace(id).tasks.firstOrNull { !it.done }?.text)
+                    nextTask = state.workspace(id).tasks.let { t ->
+                        t.firstOrNull { it.date == java.time.LocalDate.now().toString() } ?: t.firstOrNull { !it.done }
+                    }?.text?.substringAfter(": "))
             }
         }
     }

@@ -1,8 +1,9 @@
 # PA — Timetable, alarms & AI goal coaches (Android)
 
 A weekly timetable that looks like the real thing: **days across the top, hours down the side**.
-Every block repeats every week, **rings an alarm when it starts**, and opens its **own AI coach workspace**
+Every block repeats every week, **rings an alarm when it starts**, and opens its **own coach workspace**
 that turns a goal ("flexible waist in a month") into a plan that fits that exact time slot.
+**Free and fully offline** — no account, no API key, no internet.
 
 | Timetable | Coach workspace | Setting a goal |
 |---|---|---|
@@ -25,11 +26,14 @@ that turns a goal ("flexible waist in a month") into a plan that fits that exact
 - Notification shows today's checklist item, with **Snooze 5 min** and **Open coach** actions.
 - Re-booked automatically after reboot, app update, or clock/time-zone change. "Ring a test alarm" in Settings.
 
-**AI coach per activity** (powered by Claude)
+**Built-in coach per activity** (offline, free)
 - Each type has its own coach (Coach Kai for exercise, Professor Ada for studies, PM Nova for work, …).
-- Set a goal and a time frame (1 week to 3 months) → the coach builds a plan sized to your slot
-  (e.g. 3 × 1h sessions/week): a 7-day checklist plus week-by-week phases.
-- Chat for changes ("I missed Monday", "too easy") — updated checklists replace the old one automatically.
+- Set a goal and a time frame (1 week to 3 months). The coach picks a programme
+  (stretching/mobility, running, strength, general fitness, study, reading, project, mindfulness,
+  creative, meals, sleep or habit), splits it into phases, and fills every scheduled session with exercises or tasks sized to your slot.
+- A fresh checklist appears each week, getting gradually harder; the last session is a test day.
+- Quick buttons: "What's today?", "Too easy", "Too hard", "I missed a session", "Motivate me", "My progress".
+  Too easy / too hard re-scales the sessions.
 - Coach personality: Calm Mentor 🦉, Drill Sergeant 🪖 or Hype Friend 🎉.
 
 **Motivation**
@@ -43,16 +47,13 @@ that turns a goal ("flexible waist in a month") into a plan that fits that exact
    ./gradlew :app:assembleDebug
    ```
    Output: `app/build/outputs/apk/debug/app-debug.apk`
-2. Open **Settings → AI coaches** and paste a Claude API key from https://console.anthropic.com.
-   The key is stored only on the phone and sent only to Anthropic. Without a key, the timetable and alarms work and the coaches stay switched off.
-3. Allow notifications when asked (needed for alarms).
+2. Allow notifications when asked (needed for alarms).
 
 ## Tech
 
 Kotlin + Jetpack Compose (Material 3), min Android 8.0 (API 26), target API 35.
-Data is a single JSON file in app storage. AI calls use the official Anthropic Java SDK
-(`claude-opus-5-5`, with server-side refusal fallback enabled).
+Data is a single JSON file in app storage. The coach (`coach/Programs.kt`, `coach/OfflineCoach.kt`) runs entirely on the phone.
 
 ```bash
-./gradlew :app:testDebugUnitTest   # scheduling unit tests + renders docs/screenshots/*.png
+./gradlew :app:testDebugUnitTest   # unit tests + renders docs/screenshots/*.png
 ```

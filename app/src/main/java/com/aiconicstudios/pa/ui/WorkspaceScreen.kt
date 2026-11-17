@@ -3,6 +3,8 @@ package com.aiconicstudios.pa.ui
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +50,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -71,7 +74,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aiconicstudios.pa.ai.Coach
+import com.aiconicstudios.pa.coach.OfflineCoach
 import com.aiconicstudios.pa.data.Activity
 import com.aiconicstudios.pa.data.ChatMsg
 import com.aiconicstudios.pa.data.Goal
@@ -80,6 +83,7 @@ import com.aiconicstudios.pa.data.Repository
 import com.aiconicstudios.pa.data.ScheduleMath
 import com.aiconicstudios.pa.data.Settings
 import com.aiconicstudios.pa.data.Workspace
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -99,7 +103,6 @@ fun WorkspaceScreen(
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     var thinking by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
     var input by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
@@ -107,39 +110,29 @@ fun WorkspaceScreen(
     val (bg, accent) = blockColor(activity.color)
     val coachName = activity.category.coachName
 
-    fun ask(message: String) {
-        if (settings.apiKey.isBlank()) {
-            error = "Add your Claude API key in Settings to wake up $coachName."
-            return
-        }
-        val userMsg = ChatMsg(fromUser = true, text = message)
-        Repository.updateWorkspace(activity.id) { it.copy(chat = it.chat + userMsg) }
+    /** Shows the coach "typing" for a moment, then posts its reply. All on-device. */
+    fun coachSays(userText: String?, makeReply: (Workspace) -> OfflineCoach.Reply?) {
+        if (userText != null) Repository.updateWorkspace(activity.id) { it.copy(chat = it.chat + ChatMsg(true, userText)) }
         thinking = true
-        error = null
         scope.launch {
-            val latest = Repository.state.value.workspace(activity.id)
-            val result = Coach(settings.apiKey).reply(
-                activity = activity,
-                workspace = latest,
-                persona = settings.persona,
-                use24h = settings.use24h,
-                conversation = latest.chat.takeLast(30),
-            )
-            thinking = false
-            when (result) {
-                is Coach.Result.Failure -> error = result.message
-                is Coach.Result.Reply -> Repository.updateWorkspace(activity.id) { ws ->
-                    val newTasks = ScheduleMath.parseChecklist(result.text)
-                    val doneTexts = ws.tasks.filter { it.done }.map { it.text }.toSet()
-                    ws.copy(
-                        chat = ws.chat + ChatMsg(fromUser = false, text = result.text),
-                        plan = if (newTasks.isNotEmpty() || ws.plan == null) result.text else ws.plan,
-                        tasks = if (newTasks.isNotEmpty())
-                            newTasks.map { it.copy(done = it.done || it.text in doneTexts) }
-                        else ws.tasks,
-                    )
-                }
+            delay(700)
+            val reply = makeReply(Repository.state.value.workspace(activity.id))
+            if (reply != null) Repository.updateWorkspace(activity.id) {
+                reply.workspace.copy(chat = it.chat + ChatMsg(false, reply.text), checkIns = it.checkIns)
             }
+            thinking = false
+        }
+    }
+
+    fun ask(message: String) = coachSays(message) { ws ->
+        OfflineCoach.respond(activity, ws, settings.persona, message, today)
+    }
+
+    // When a new week of the goal starts, the coach posts that week's checklist.
+    LaunchedEffect(workspace.goal, workspace.planWeek, today) {
+        val goal = workspace.goal ?: return@LaunchedEffect
+        if (OfflineCoach.weekIndex(goal, today) != workspace.planWeek) {
+            coachSays(null) { ws -> OfflineCoach.refreshWeek(activity, ws, settings.persona, today) }
         }
     }
 
@@ -169,22 +162,32 @@ fun WorkspaceScreen(
         bottomBar = {
             if (workspace.goal != null) {
                 Surface(tonalElevation = 3.dp, modifier = Modifier.imePadding()) {
+                    Column(Modifier.navigationBarsPadding()) {
                     Row(
-                        Modifier.fillMaxWidth().navigationBarsPadding().padding(8.dp),
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        quickReplies.forEach { q ->
+                            SuggestionChip(onClick = { if (!thinking) ask(q) }, label = { Text(q) })
+                        }
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         OutlinedTextField(
                             value = input,
                             onValueChange = { input = it },
-                            placeholder = { Text("Ask $coachName… (e.g. I missed Monday)") },
+                            placeholder = { Text("Message $coachName…") },
+                            singleLine = true,
                             modifier = Modifier.weight(1f),
-                            maxLines = 4,
                         )
                         Spacer(Modifier.width(8.dp))
                         FilledIconButton(
                             onClick = { ask(input.trim()); input = "" },
                             enabled = input.isNotBlank() && !thinking,
                         ) { Icon(Icons.AutoMirrored.Filled.Send, "Send") }
+                    }
                     }
                 }
             }
@@ -198,23 +201,13 @@ fun WorkspaceScreen(
         ) {
             item { CoachHeader(activity, workspace, today, accent) }
 
-            if (settings.apiKey.isBlank()) item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("🔑 Connect your coach", fontWeight = FontWeight.Bold)
-                        Text("$coachName runs on Claude. Add your Claude API key once in Settings and every activity's coach comes alive.")
-                        TextButton(onClick = onOpenSettings) { Text("Open Settings") }
-                    }
-                }
-            }
-
             val goal = workspace.goal
             if (goal == null) {
                 item { GoalForm(activity, enabled = !thinking) { text, days ->
-                    Repository.updateWorkspace(activity.id) {
-                        it.copy(goal = Goal(text, days, today.toString()), plan = null, tasks = emptyList(), chat = emptyList())
+                    val goal = Goal(text, days, today.toString())
+                    coachSays("My goal: $text, in ${OfflineCoach.durationLabel(days)}.") { ws ->
+                        OfflineCoach.startGoal(activity, ws, goal, settings.persona, today)
                     }
-                    ask(Coach.planRequest(text, days))
                 } }
             } else {
                 item {
@@ -242,21 +235,7 @@ fun WorkspaceScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(10.dp))
-                    Text("$coachName is thinking…", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-            error?.let { e ->
-                item {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(e, Modifier.weight(1f))
-                            val lastUser = workspace.chat.lastOrNull()?.takeIf { it.fromUser }
-                            if (lastUser != null && settings.apiKey.isNotBlank()) TextButton(onClick = {
-                                Repository.updateWorkspace(activity.id) { it.copy(chat = it.chat.dropLast(1)) }
-                                ask(lastUser.text)
-                            }) { Text("Retry") }
-                        }
-                    }
+                    Text("$coachName is typing…", style = MaterialTheme.typography.bodyMedium)
                 }
             }
             item { Spacer(Modifier.height(24.dp)) }
@@ -287,6 +266,10 @@ fun WorkspaceScreen(
         )
     }
 }
+
+private val quickReplies = listOf(
+    "What's today?", "Too easy", "Too hard", "I missed a session", "Motivate me", "My progress",
+)
 
 private fun cheer(streak: Int) = when {
     streak >= 30 -> "🏆 $streak in a row. Legendary."
@@ -366,7 +349,7 @@ private fun GoalForm(activity: Activity, enabled: Boolean, onSubmit: (String, In
             Text("Achieve it in", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(7, 14, 30, 60, 90).forEach { d ->
-                    FilterChip(selected = days == d, onClick = { days = d }, label = { Text(Coach.durationLabel(d)) })
+                    FilterChip(selected = days == d, onClick = { days = d }, label = { Text(OfflineCoach.durationLabel(d)) })
                 }
             }
             Button(
@@ -422,22 +405,41 @@ private fun ChecklistCard(activityId: String, tasks: List<PlanTask>, accent: and
         Column(Modifier.padding(vertical = 8.dp)) {
             Text("This week's checklist", Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = accent)
+            val today = LocalDate.now().toString()
             tasks.forEach { task ->
-                Row(
-                    Modifier.fillMaxWidth().clickable {
-                        Repository.updateWorkspace(activityId) { ws ->
-                            ws.copy(tasks = ws.tasks.map { if (it.id == task.id) it.copy(done = !it.done) else it })
+                // "Mon 16 Nov: warm-up · move · move" → a date line with one move per line underneath.
+                val day = task.text.substringBefore(": ", "")
+                val steps = task.text.substringAfter(": ").split(" · ")
+                val isToday = task.date == today
+                Column(
+                    Modifier.fillMaxWidth()
+                        .background(if (isToday && !task.done) accent.copy(alpha = 0.10f) else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable {
+                            Repository.updateWorkspace(activityId) { ws ->
+                                ws.copy(tasks = ws.tasks.map { if (it.id == task.id) it.copy(done = !it.done) else it })
+                            }
                         }
-                    }.padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
-                    Checkbox(checked = task.done, onCheckedChange = null, modifier = Modifier.padding(8.dp))
-                    Text(
-                        task.text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (task.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                        textDecoration = if (task.done) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = task.done, onCheckedChange = null, modifier = Modifier.padding(8.dp))
+                        Text(
+                            day.ifEmpty { steps.first() } + if (isToday) "  · TODAY" else "",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (task.done) MaterialTheme.colorScheme.onSurfaceVariant else if (isToday) accent else MaterialTheme.colorScheme.onSurface,
+                            textDecoration = if (task.done) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
+                        )
+                    }
+                    if (!task.done) {
+                        (if (day.isEmpty()) steps.drop(1) else steps).forEach { step ->
+                            Text(
+                                "•  $step",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(start = 44.dp, bottom = 2.dp),
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,7 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Scaffold
@@ -39,9 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aiconicstudios.pa.alarm.AlarmScheduler
 import com.aiconicstudios.pa.data.Persona
@@ -53,8 +48,6 @@ import com.aiconicstudios.pa.data.Settings
 @Composable
 fun SettingsScreen(settings: Settings, onBack: () -> Unit) {
     val context = LocalContext.current
-    var key by remember { mutableStateOf(settings.apiKey) }
-    var showKey by remember { mutableStateOf(false) }
     var hours by remember { mutableStateOf(settings.firstHour.toFloat()..settings.lastHour.toFloat()) }
 
     Scaffold(
@@ -69,22 +62,11 @@ fun SettingsScreen(settings: Settings, onBack: () -> Unit) {
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Section("🤖 AI coaches") {
+            Section("🧑‍🏫 Coaches") {
                 Text(
-                    "Coaches run on Claude by Anthropic. Paste an API key from console.anthropic.com. " +
-                        "It is stored only on this phone and sent only to Anthropic.",
+                    "Every activity has a built-in coach that plans your sessions. " +
+                        "It works offline and is completely free — no account or internet needed.",
                     style = MaterialTheme.typography.bodySmall,
-                )
-                OutlinedTextField(
-                    value = key,
-                    onValueChange = { key = it.trim(); Repository.updateSettings { s -> s.copy(apiKey = key) } },
-                    label = { Text("Claude API key") },
-                    placeholder = { Text("sk-ant-…") },
-                    singleLine = true,
-                    visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    trailingIcon = { TextButton(onClick = { showKey = !showKey }) { Text(if (showKey) "Hide" else "Show") } },
-                    modifier = Modifier.fillMaxWidth(),
                 )
                 Text("Coach personality", style = MaterialTheme.typography.labelLarge)
                 Persona.entries.forEach { p ->
@@ -144,7 +126,7 @@ fun SettingsScreen(settings: Settings, onBack: () -> Unit) {
             }
 
             Section("ℹ️ About") {
-                Text("PA — your timetable, alarms and goal coaches in one place. Version 1.0",
+                Text("PA — your timetable, alarms and goal coaches in one place. Version 1.1 · works fully offline",
                     style = MaterialTheme.typography.bodySmall)
             }
         }
